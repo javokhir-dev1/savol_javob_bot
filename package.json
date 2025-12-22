@@ -1,0 +1,19 @@
+{
+  "name": "savol_javob",
+  "version": "1.0.0",
+  "description": "",
+  "license": "ISC",
+  "author": "",
+  "type": "module",
+  "main": "app.js",
+  "scripts": {
+    "dev": "node --watch app"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "pg": "^8.16.3",
+    "sequelize": "^6.37.7",
+    "telegraf": "^4.16.3",
+    "xlsx": "^0.18.5"
+  }
+}
