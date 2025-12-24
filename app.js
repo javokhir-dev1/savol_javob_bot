@@ -349,10 +349,9 @@ async function getResult(ctx, num) {
     const results = await UserResult.findAll({ where: { correctAnswers: num } })
     const resultsArr = []
 
-
     for (let i = 0; i < results.length; i++) {
-        const user = await ctx.getChat(results[i].user_id)
-        resultsArr.push(`${results[i].user_id} ${user.first_name} ${user.last_name || ""} ${results[i].questions}/${results[i].correctAnswers}`)
+        const user = await User.findOne({ where: { user_id: results[i].user_id } })
+        resultsArr.push(`${results[i].user_id} ${user.full_name} ${results[i].questions}/${results[i].correctAnswers}`)
     }
     const file_name = `${uuidv4()}.xlsx`
 
@@ -386,8 +385,8 @@ bot.action("all_results", async (ctx) => {
 
 
         for (let i = 0; i < results.length; i++) {
-            const user = await ctx.getChat(results[i].user_id)
-            resultsArr.push(`${results[i].user_id} ${user.first_name} ${user.last_name || ""} ${results[i].questions}/${results[i].correctAnswers}`)
+            const user = await User.findOne({ where: { user_id: results[i].user_id } })
+            resultsArr.push(`${results[i].user_id} ${user.full_name} ${results[i].questions}/${results[i].correctAnswers}`)
         }
         const file_name = `${uuidv4()}.xlsx`
 
