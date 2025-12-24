@@ -13,6 +13,15 @@ export const UserResult = sequelize.define(
             type: DataTypes.STRING,
             allowNull: false,
         },
+        questions: {
+            type: DataTypes.INTEGER,
+        },
+        correctAnswers: {
+            type: DataTypes.INTEGER,
+        },
+        date: {
+            type: DataTypes.STRING,
+        }
     },
     {
         tableName: "userresult",

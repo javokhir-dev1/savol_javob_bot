@@ -205,11 +205,16 @@ bot.on("message", async (ctx) => {
     try {
         if (!session[ctx.from.id]) session[ctx.from.id] = {}
         if (session[ctx.from.id]["state"] == "waiting_question") {
-            await Question.create({ body: ctx.message.text })
-            await ctx.reply("Savol qo'shildi!")
+            const question = await Question.create({ body: ctx.message.text })
+            await ctx.reply("Savol qo'shildi!",
+                Markup.inlineKeyboard([
+                    [Markup.button.callback("Variant qo'shish", `add_variant_${question.id}`)]
+                ])
+            )
         } else if (session[ctx.from.id]["state"] == "waiting_variant") {
+            const question_id = session[ctx.from.id]["question_id"]
             const newOption = await Option.create({
-                question_id: session[ctx.from.id]["question_id"],
+                question_id: question_id,
                 option_text: ctx.message.text,
                 is_correct: false
             })
@@ -217,7 +222,7 @@ bot.on("message", async (ctx) => {
             await ctx.reply("Bu variant to'g'ri javobmi!",
                 Markup.inlineKeyboard([
                     [Markup.button.callback("Ha", `correct_variant_${newOption.id}`)],
-                    [Markup.button.callback("Yo'q", `incorrect_variant`)],
+                    [Markup.button.callback("Yo'q", `incorrect_variant`)]
                 ])
             )
         } else if (session[ctx.from.id]["state"] == "waiting_timer") {
@@ -236,6 +241,16 @@ bot.on("message", async (ctx) => {
     }
 })
 
+bot.action("stop_variant", async (ctx) => {
+    try {
+        if (!session[ctx.from.id]) session[ctx.from.id] = {}
+        session[ctx.from.id]["state"] = ""
+        await ctx.reply("Variant qo'shish bekor qilindi")
+    } catch (err) {
+        console.log(err)
+    }
+})
+
 bot.action(/correct_variant_(.+)/, async (ctx) => {
     try {
         const optionId = ctx.match[1]
@@ -244,17 +259,35 @@ bot.action(/correct_variant_(.+)/, async (ctx) => {
         await ctx.reply("Option qo'shildi")
         await ctx.deleteMessage()
             .catch((err) => console.log(err))
+
+        if (!session[ctx.from.id]) session[ctx.from.id] = {}
+        const question_id = session[ctx.from.id]["question_id"]
+
+        await ctx.reply("Ya'na variant qo'shasizmi?",
+            Markup.inlineKeyboard([
+                [Markup.button.callback("Ha", `add_variant_${question_id}`)],
+                [Markup.button.callback("Yo'q", "stop_variant")]
+            ])
+        )
     } catch (err) {
         console.log(err)
     }
 })
-
 
 bot.action("incorrect_variant", async (ctx) => {
     try {
         await ctx.reply("Option qo'shildi")
         await ctx.deleteMessage()
             .catch((err) => console.log(err))
+
+        if (!session[ctx.from.id]) session[ctx.from.id] = {}
+        const question_id = session[ctx.from.id]["question_id"]
+        await ctx.reply("Ya'na variant qo'shasizmi?",
+            Markup.inlineKeyboard([
+                [Markup.button.callback("Ha", `add_variant_${question_id}`)],
+                [Markup.button.callback("Yo'q", "stop_variant")]
+            ])
+        )
     } catch (err) {
         console.log(err)
     }
@@ -276,26 +309,86 @@ function saveArrayToExcel(array, filePath) {
 
 bot.action("get_results", async (ctx) => {
     try {
-        const results = await UserResult.findAll()
-        const questions = await Question.findAll()
-        const resultsArr = []
-        for (let i = 0; i < results.length; i++) {
-            const answers = await UserAnswer.findAll({ where: { user_id: results[i].user_id } })
-            let correctAnswersCount = 0
-            for (let j = 0; j < answers.length; j++) {
-                const option = await Option.findOne({ where: { id: answers[j].option_id } })
+        await ctx.reply("Quyidagilardan birini tanlang",
+            Markup.inlineKeyboard([
+                [Markup.button.callback("Barchasi", "all_results")],
+                [Markup.button.callback("10/10", "on_10")],
+                [Markup.button.callback("10/9", "on_9")],
+                [Markup.button.callback("10/8", "on_8")],
+            ])
+        )
+        // const results = await UserResult.findAll({ raw: true })
+        // const resultsArr = []
 
-                if (option.is_correct) {
-                    correctAnswersCount++
-                }
+
+        // for (let i = 0; i < results.length; i++) {
+        //     const user = await ctx.getChat(results[i].user_id)
+        //     resultsArr.push(`${results[i].user_id} ${user.first_name} ${user.last_name || ""} ${results[i].questions}/${results[i].correctAnswers}`)
+        // }
+        // const file_name = `${uuidv4()}.xlsx`
+
+        // try {
+        //     saveArrayToExcel(resultsArr, file_name)
+        //     await ctx.replyWithDocument({ source: file_name })
+        // } catch (err) {
+        //     console.log(err)
+        // } finally {
+        //     fs.unlink(file_name, (err) => {
+        //         if (err) {
+        //             console.log(err)
+        //         }
+        //     })
+        // }
+
+    } catch (err) {
+        console.log(err)
+    }
+})
+
+async function getResult(ctx, num) {
+    const results = await UserResult.findAll({ where: { correctAnswers: num } })
+    const resultsArr = []
+
+
+    for (let i = 0; i < results.length; i++) {
+        const user = await ctx.getChat(results[i].user_id)
+        resultsArr.push(`${results[i].user_id} ${user.first_name} ${user.last_name || ""} ${results[i].questions}/${results[i].correctAnswers}`)
+    }
+    const file_name = `${uuidv4()}.xlsx`
+
+    try {
+        saveArrayToExcel(resultsArr, file_name)
+        await ctx.replyWithDocument({ source: file_name })
+    } catch (err) {
+        console.log(err)
+    } finally {
+        fs.unlink(file_name, (err) => {
+            if (err) {
+                console.log(err)
             }
+        })
+    }
+}
+
+bot.action(/on_(.+)/, async (ctx) => {
+    try {
+        const count = ctx.match[1]
+        getResult(ctx, count)
+    } catch (err) {
+        console.log(err)
+    }
+})
+
+bot.action("all_results", async (ctx) => {
+    try {
+        const results = await UserResult.findAll()
+        const resultsArr = []
 
 
-            const user = await User.findOne({ where: { user_id: String(results[i].user_id) } })
-
-            resultsArr.push(`${results[i].user_id} ${user.full_name} ${questions.length}/${correctAnswersCount}`)
+        for (let i = 0; i < results.length; i++) {
+            const user = await ctx.getChat(results[i].user_id)
+            resultsArr.push(`${results[i].user_id} ${user.first_name} ${user.last_name || ""} ${results[i].questions}/${results[i].correctAnswers}`)
         }
-
         const file_name = `${uuidv4()}.xlsx`
 
         try {
@@ -310,7 +403,6 @@ bot.action("get_results", async (ctx) => {
                 }
             })
         }
-
     } catch (err) {
         console.log(err)
     }
